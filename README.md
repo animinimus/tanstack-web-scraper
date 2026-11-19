@@ -1,301 +1,124 @@
-Welcome to your new TanStack app! 
+# Recall
 
-# Getting Started
+**Recall** is a personal web content library. Sign in, import pages by URL, and Firecrawl scrapes each link into markdown with metadata stored in PostgreSQL. Browse saved items in a dashboard with search and status filters.
 
-To run this application:
+Built with TanStack Start (full-stack React), Prisma, better-auth, and the Firecrawl API.
+
+## Features
+
+- **Email and password auth** — Sign up and sign in via [better-auth](https://www.better-auth.com/) with sessions persisted in PostgreSQL (`/login`, `/signup`).
+- **Single URL import** — Paste a URL; the app creates a `SavedItem`, scrapes via Firecrawl, and stores title, markdown content, author, publish date, and Open Graph image.
+- **Bulk import** — Map a site (with optional search) to discover links, select URLs, and scrape them in batch (up to 25 links per map request).
+- **Saved library** — List items at `/dashboard/items` with text search, status filter (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`), and copy-to-clipboard for URLs.
+- **Dashboard shell** — Sidebar navigation (Items, Import, Discover placeholder), theme toggle (light/dark), and route protection for `/dashboard/*`.
+
+Schema fields for AI-generated `summary` and `tags` exist on `SavedItem`, but the current scrape flow does not populate them.
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | [TanStack Start](https://tanstack.com/start) + [TanStack Router](https://tanstack.com/router) (file-based routes) |
+| UI | React 19, Tailwind CSS 4, shadcn/ui-style components |
+| Auth | [better-auth](https://www.better-auth.com/) (Prisma adapter, TanStack Start cookies) |
+| Database | PostgreSQL via [Prisma](https://www.prisma.io/) 7 (`@prisma/adapter-pg`) |
+| Scraping | [@mendable/firecrawl-js](https://github.com/mendableai/firecrawl) |
+| Validation | Zod |
+| Server | Nitro (Vite plugin) |
+
+## Architecture
+
+```
+Browser (React)
+    │
+    ├─ File routes (src/routes) — pages + layouts
+    ├─ Server functions (src/data) — auth-gated Prisma + Firecrawl calls
+    └─ /api/auth/* — better-auth handler
+
+Request middleware (src/start.ts, src/middleware/auth.ts)
+    └─ Redirects unauthenticated users away from /dashboard/*
+
+PostgreSQL
+    ├─ better-auth tables (User, Session, Account, Verification)
+    └─ SavedItem — per-user scraped content and status
+```
+
+**Key paths**
+
+- `src/lib/auth.ts` — better-auth server config
+- `src/data/items.ts` — `scrapeUrlFn`, `mapUrlFn`, `bulkScrapeUrlsFn`, `getItemsFn`
+- `src/lib/firecrawl.ts` — Firecrawl client
+- `prisma/schema.prisma` — data models
+
+## Local setup
+
+### Prerequisites
+
+- Node.js 20+
+- [pnpm](https://pnpm.io/)
+- PostgreSQL database
+- [Firecrawl](https://www.firecrawl.dev/) API key
+
+### Install
 
 ```bash
 pnpm install
-pnpm start
 ```
 
-# Building For Production
+### Environment
 
-To build this application for production:
+Copy the example file and fill in values:
+
+```bash
+cp .env.example .env.local
+```
+
+Database scripts load `.env.local` via `dotenv-cli`. See `.env.example` for every variable the app reads.
+
+### Database
+
+Generate the Prisma client and sync the schema:
+
+```bash
+pnpm db:generate
+pnpm db:push
+```
+
+Optional: open Prisma Studio with `pnpm db:studio`.
+
+### Run
+
+Development (port 3000):
+
+```bash
+pnpm dev
+```
+
+Production build and preview:
 
 ```bash
 pnpm build
+pnpm preview
 ```
 
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+### Other scripts
 
 ```bash
-pnpm test
+pnpm lint      # ESLint
+pnpm format    # Prettier (check)
+pnpm check     # Prettier write + ESLint fix
 ```
 
-## Styling
+There is no application test suite in the repository yet (`pnpm test` runs Vitest but no tests are defined).
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+## Roadmap and limitations
 
+- **`/dashboard/discover`** — Placeholder route only; not implemented.
+- **Summaries and tags** — Prisma fields exist; scraping does not fill them yet.
+- **Bulk scrape** — Runs sequentially; no job queue or progress UI beyond item status.
+- **Email verification** — Disabled in better-auth config.
+- **Auth client `baseURL`** — Hard-coded to `http://localhost:3000` in `src/lib/auth-client.ts`; adjust for non-local deployments.
 
-## Linting & Formatting
+## License
 
-
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
-
-```bash
-pnpm lint
-pnpm format
-pnpm check
-```
-
-
-
-## Routing
-This project uses [TanStack Router](https://tanstack.com/router). The initial setup is a file based router. Which means that the routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add another a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you use the `<Outlet />` component.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-
-import { Link } from "@tanstack/react-router";
-
-export const Route = createRootRoute({
-  component: () => (
-    <>
-      <header>
-        <nav>
-          <Link to="/">Home</Link>
-          <Link to="/about">About</Link>
-        </nav>
-      </header>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
-})
-```
-
-The `<TanStackRouterDevtools />` component is not required so you can remove it if you don't want it in your layout.
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-const peopleRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/people",
-  loader: async () => {
-    const response = await fetch("https://swapi.dev/api/people");
-    return response.json() as Promise<{
-      results: {
-        name: string;
-      }[];
-    }>;
-  },
-  component: () => {
-    const data = peopleRoute.useLoaderData();
-    return (
-      <ul>
-        {data.results.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    );
-  },
-});
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-### React-Query
-
-React-Query is an excellent addition or alternative to route loading and integrating it into you application is a breeze.
-
-First add your dependencies:
-
-```bash
-pnpm add @tanstack/react-query @tanstack/react-query-devtools
-```
-
-Next we'll need to create a query client and provider. We recommend putting those in `main.tsx`.
-
-```tsx
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-// ...
-
-const queryClient = new QueryClient();
-
-// ...
-
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
-
-  root.render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
-}
-```
-
-You can also add TanStack Query Devtools to the root route (optional).
-
-```tsx
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-
-const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <Outlet />
-      <ReactQueryDevtools buttonPosition="top-right" />
-      <TanStackRouterDevtools />
-    </>
-  ),
-});
-```
-
-Now you can use `useQuery` to fetch your data.
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-import "./App.css";
-
-function App() {
-  const { data } = useQuery({
-    queryKey: ["people"],
-    queryFn: () =>
-      fetch("https://swapi.dev/api/people")
-        .then((res) => res.json())
-        .then((data) => data.results as { name: string }[]),
-    initialData: [],
-  });
-
-  return (
-    <div>
-      <ul>
-        {data.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default App;
-```
-
-You can find out everything you need to know on how to use React-Query in the [React-Query documentation](https://tanstack.com/query/latest/docs/framework/react/overview).
-
-## State Management
-
-Another common requirement for React applications is state management. There are many options for state management in React. TanStack Store provides a great starting point for your project.
-
-First you need to add TanStack Store as a dependency:
-
-```bash
-pnpm add @tanstack/store
-```
-
-Now let's create a simple counter in the `src/App.tsx` file as a demonstration.
-
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store } from "@tanstack/store";
-import "./App.css";
-
-const countStore = new Store(0);
-
-function App() {
-  const count = useStore(countStore);
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
-    </div>
-  );
-}
-
-export default App;
-```
-
-One of the many nice features of TanStack Store is the ability to derive state from other state. That derived state will update when the base state updates.
-
-Let's check this out by doubling the count using derived state.
-
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store, Derived } from "@tanstack/store";
-import "./App.css";
-
-const countStore = new Store(0);
-
-const doubledStore = new Derived({
-  fn: () => countStore.state * 2,
-  deps: [countStore],
-});
-doubledStore.mount();
-
-function App() {
-  const count = useStore(countStore);
-  const doubledCount = useStore(doubledStore);
-
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
-      <div>Doubled - {doubledCount}</div>
-    </div>
-  );
-}
-
-export default App;
-```
-
-We use the `Derived` class to create a new store that is derived from another store. The `Derived` class has a `mount` method that will start the derived store updating.
-
-Once we've created the derived store we can use it in the `App` component just like we would any other store using the `useStore` hook.
-
-You can find out everything you need to know on how to use TanStack Store in the [TanStack Store documentation](https://tanstack.com/store/latest).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
+See repository defaults; application code is a personal portfolio project.
